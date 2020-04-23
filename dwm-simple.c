@@ -108,7 +108,7 @@ struct Point threePoints(int *dis, struct Point *ps){
         struct Point p;
         p.x=0;
         p.y=0;
-        if (dis==NULL || ps==NULL)
+        /*if (dis==NULL || ps==NULL)
                 return p;
         for (int j=0; j<3; ++j){
                 if (dis[j]<0)
@@ -130,7 +130,22 @@ struct Point threePoints(int *dis, struct Point *ps){
                 }
         }
         p.x /=3;
-        p.y /=3;
+        p.y /=3;*/
+        double z,a_p,b_p,c_p,cos1,cos2;
+        z=dis[0]*dis[0]-((3600*3600+dis[0]*dis[0]-dis[2]*dis[2])/(3600*2))*((3600*3600+dis[0]*dis[0]-dis[2]*dis[2])/(3600*2))-((2400*2400+dis[0]*dis[0]-dis[1]*dis[1])/(2400*2))*((2400*2400+dis[0]*dis[0]-dis[1]*dis[1])/(2400*2));
+        printf("z axies is : %f",z);
+        z=0;
+        a_p=sqrt(dis[0]*dis[0]-z);
+        b_p=sqrt(dis[1]*dis[1]-z);
+        c_p=sqrt(dis[2]*dis[2]-z);
+        cos1=(3600*3600+a_p*a_p-c_p*c_p)/(2*3600*a_p);
+        printf("cos1:%f\n",cos1);
+        p.x=cos1*a_p;
+        cos2=(2400*2400+a_p*a_p-b_p*b_p)/(2*2400*a_p);
+        printf("cos2: %f\n",cos2);
+        p.y=cos2*a_p;
+
+        
         printf("Calculate position is [%d,%d]", p.x, p.y);
 }
 /**
@@ -233,7 +248,7 @@ void app_thread_entry(uint32_t data)
 
 /*get z position*/
 
-int dis_arry[]={loc.anchors.dist.dist[1],loc.anchors.dist.dist[0],loc.anchors.dist.dist[2]};
+int dis_arry[]={loc.anchors.dist.dist[0],loc.anchors.dist.dist[2],loc.anchors.dist.dist[1]};
         if (0 == rv) {
                 if (loc.pos_available) {
                         printf("[%ld,%ld,%ld,%u] ", loc.pos.x, loc.pos.y, loc.pos.z,loc.pos.qf);
