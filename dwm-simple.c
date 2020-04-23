@@ -10,6 +10,7 @@
 
 #include "dwm.h"
 #include <stdio.h>
+#include <math.h>
 
 /* Thread priority */
 #ifndef THREAD_APP_PRIO
@@ -68,8 +69,8 @@ void on_dwm_evt(dwm_evt_t *p_evt)
 
 			printf("=[%lu,%u] ", p_evt->loc.anchors.dist.dist[i],
 					p_evt->loc.anchors.dist.qf[i]);
-		}
-		printf("\n");*/
+		}*/
+		printf("\n");
 		break;
 
 	case DWM_EVT_USR_DATA_READY:
@@ -100,6 +101,38 @@ void on_dwm_evt(dwm_evt_t *p_evt)
 	}
 }
 
+/*get x,y position using distance*/
+
+
+struct Point threePoints(int *dis, struct Point *ps){
+        struct Point p;
+        p.x=0;
+        p.y=0;
+        if (dis==NULL || ps==NULL)
+                return p;
+        for (int j=0; j<3; ++j){
+                if (dis[j]<0)
+                        printf("There is an error with the distance!");
+                for (int k=j+1;k<3;++k){
+                        printf("debug:%d\n",dis[j]);
+                        float p2p= (float)sqrt((ps[j].x-ps[k].x)*(ps[j].x-ps[k].x)+(ps[j].y-ps[k].y)*(ps[j].y-ps[k].y));
+                        if(dis[j]+dis[k]<=p2p){
+                                p.x +=ps[j].x+(ps[k].x-ps[j].x)*dis[j]/(dis[j]+dis[k]);
+                                printf("can you see me!!!!");
+                                p.y +=ps[j].y+(ps[k].y-ps[j].y)*dis[j]/(dis[j]+dis[k]);}
+                        else{
+                                float dr=p2p/2+(dis[j]*dis[j]+dis[k]*dis[k])/(2*p2p);
+                                p.x += ps[j].x+(ps[k].x-ps[j].x)*dr/p2p;
+                                printf("p.x value is : %d",p.x);
+                                printf("look here!!!!");
+                                p.y += ps[j].y+(ps[k].y-ps[j].y)*dr/p2p;
+                        }
+                }
+        }
+        p.x /=3;
+        p.y /=3;
+        printf("Calculate position is [%d,%d]", p.x, p.y);
+}
 /**
  * Application thread
  *
@@ -122,11 +155,14 @@ void app_thread_entry(uint32_t data)
 
 
 
+
 	dwm_evt_t evt;
-	int rv;
+	int rv,i;
 	uint8_t label[DWM_LABEL_LEN_MAX];
 	uint8_t label_len = DWM_LABEL_LEN_MAX;
         dwm_pos_t pos;
+        dwm_loc_data_t loc;
+        
 
 	/* Initial message */
 	printf(MSG_INIT);
@@ -175,6 +211,16 @@ void app_thread_entry(uint32_t data)
 	} else {
 		printf("can't read label len=%d, error %d\n", label_len, rv);
 	}
+        /*get initial velocity*/
+        int a, b, c, d, e, f;
+         rv = dwm_loc_get(&loc);
+         a=loc.pos.x;
+         b=loc.pos.y;
+         c=loc.pos.z;
+
+
+
+        
 
 
 
@@ -182,8 +228,51 @@ void app_thread_entry(uint32_t data)
 
 
 	while (1) {
-                /* Read from the accelerometer */
-        for (int i=0;i<100;i++)
+/*get last distance to the anchors and the position*/
+               rv = dwm_loc_get(&loc);
+
+/*get z position*/
+
+int dis_arry[]={loc.anchors.dist.dist[1],loc.anchors.dist.dist[0],loc.anchors.dist.dist[2]};
+        if (0 == rv) {
+                if (loc.pos_available) {
+                        printf("[%ld,%ld,%ld,%u] ", loc.pos.x, loc.pos.y, loc.pos.z,loc.pos.qf);
+                        threePoints(dis_arry, Points);
+printf("\n");
+
+
+                        //printf("Calculate position is [%d,%d]", p.x, p.y);
+                        d=loc.pos.x;
+                        e=loc.pos.y;  
+                        f=loc.pos.z;
+                        double velocity;
+                        velocity=fabs(sqrt(a*a+b*b+c*c)-sqrt(d*d+e*e+f*f));
+                        printf("velocity%lf \n", velocity);
+                        a=loc.pos.x;
+                        b=loc.pos.y;
+                        c=loc.pos.z;
+                      
+                }
+                //for (i = 0; i < loc.anchors.dist.cnt; ++i) {
+                        //printf("%u)", i);
+                        printf("0");
+                        printf("0x%04x", loc.anchors.dist.addr[0]);
+                        printf("=%lu,%u ", loc.anchors.dist.dist[0], loc.anchors.dist.qf[0]);
+                        printf("1");
+                        printf("0x%04x", loc.anchors.dist.addr[1]);
+                        printf("=%lu,%u ", loc.anchors.dist.dist[1], loc.anchors.dist.qf[1]);
+                        printf("2");
+                        printf("0x%04x", loc.anchors.dist.addr[2]);
+                        printf("=%lu,%u ", loc.anchors.dist.dist[2], loc.anchors.dist.qf[2]);
+                        /*calculate x,y,z axes by math*/
+
+                //}
+                printf("\n");
+        } else {
+                printf("err code: %d\n", rv);
+        }      
+
+        for (int i=100;i<100;i++)
         {i2cbyteXH = 0x28;
         rv = dwm_i2c_write(0x33 >> 1, &i2cbyteXH, 1, true);
 	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteXH, 1);
@@ -252,4 +341,3 @@ void dwm_user_start(void)
 	/* Start the thread */
 	dwm_thread_resume(hndl);
 }
-
