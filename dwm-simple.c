@@ -101,14 +101,14 @@ void on_dwm_evt(dwm_evt_t *p_evt)
 	}
 }
 
-/*get x,y position using distance*/
+/*get x,y position using distance
 
 
 struct Point threePoints(int *dis, struct Point *ps){
         struct Point p;
         p.x=0;
         p.y=0;
-        /*if (dis==NULL || ps==NULL)
+        if (dis==NULL || ps==NULL)
                 return p;
         for (int j=0; j<3; ++j){
                 if (dis[j]<0)
@@ -118,19 +118,19 @@ struct Point threePoints(int *dis, struct Point *ps){
                         float p2p= (float)sqrt((ps[j].x-ps[k].x)*(ps[j].x-ps[k].x)+(ps[j].y-ps[k].y)*(ps[j].y-ps[k].y));
                         if(dis[j]+dis[k]<=p2p){
                                 p.x +=ps[j].x+(ps[k].x-ps[j].x)*dis[j]/(dis[j]+dis[k]);
-                                printf("can you see me!!!!");
+                                //printf("can you see me!!!!");
                                 p.y +=ps[j].y+(ps[k].y-ps[j].y)*dis[j]/(dis[j]+dis[k]);}
                         else{
                                 float dr=p2p/2+(dis[j]*dis[j]+dis[k]*dis[k])/(2*p2p);
                                 p.x += ps[j].x+(ps[k].x-ps[j].x)*dr/p2p;
-                                printf("p.x value is : %d",p.x);
-                                printf("look here!!!!");
+                                //printf("p.x value is : %d",p.x);
+                                //printf("look here!!!!");
                                 p.y += ps[j].y+(ps[k].y-ps[j].y)*dr/p2p;
                         }
                 }
         }
         p.x /=3;
-        p.y /=3;*/
+        p.y /=3;
         double z,a_p,b_p,c_p,cos1,cos2;
         z=dis[0]*dis[0]-((3600*3600+dis[0]*dis[0]-dis[2]*dis[2])/(3600*2))*((3600*3600+dis[0]*dis[0]-dis[2]*dis[2])/(3600*2))-((2400*2400+dis[0]*dis[0]-dis[1]*dis[1])/(2400*2))*((2400*2400+dis[0]*dis[0]-dis[1]*dis[1])/(2400*2));
         printf("z axies is : %f",z);
@@ -147,7 +147,7 @@ struct Point threePoints(int *dis, struct Point *ps){
 
         
         printf("Calculate position is [%d,%d]", p.x, p.y);
-}
+}*/
 /**
  * Application thread
  *
@@ -234,26 +234,15 @@ void app_thread_entry(uint32_t data)
          c=loc.pos.z;
 
 
-
-        
-
-
-
-
-
-
 	while (1) {
 /*get last distance to the anchors and the position*/
                rv = dwm_loc_get(&loc);
-
-/*get z position*/
-
-int dis_arry[]={loc.anchors.dist.dist[0],loc.anchors.dist.dist[2],loc.anchors.dist.dist[1]};
+               printf("0");
+ 
         if (0 == rv) {
                 if (loc.pos_available) {
                         printf("[%ld,%ld,%ld,%u] ", loc.pos.x, loc.pos.y, loc.pos.z,loc.pos.qf);
-                        threePoints(dis_arry, Points);
-printf("\n");
+                        printf("\n");
 
 
                         //printf("Calculate position is [%d,%d]", p.x, p.y);
@@ -268,24 +257,61 @@ printf("\n");
                         c=loc.pos.z;
                       
                 }
-                //for (i = 0; i < loc.anchors.dist.cnt; ++i) {
-                        //printf("%u)", i);
-                        printf("0");
-                        printf("0x%04x", loc.anchors.dist.addr[0]);
-                        printf("=%lu,%u ", loc.anchors.dist.dist[0], loc.anchors.dist.qf[0]);
-                        printf("1");
-                        printf("0x%04x", loc.anchors.dist.addr[1]);
-                        printf("=%lu,%u ", loc.anchors.dist.dist[1], loc.anchors.dist.qf[1]);
-                        printf("2");
-                        printf("0x%04x", loc.anchors.dist.addr[2]);
-                        printf("=%lu,%u ", loc.anchors.dist.dist[2], loc.anchors.dist.qf[2]);
-                        /*calculate x,y,z axes by math*/
 
-                //}
+
+         for (i = 0; i < loc.anchors.dist.cnt; ++i) {
+                    printf("%u)", i);
+                    printf("0x%04x", loc.anchors.dist.addr[i]);
+                    printf("=%lu,%u \n", loc.anchors.dist.dist[i], loc.anchors.dist.qf[i]);}
+                        
+/*law of cosine*/
+uint32_t dis[]={0,0,0};
+
+
+for (i = 0; i < loc.anchors.dist.cnt; ++i) {
+                    if (loc.anchors.dist.addr[i]==0xd4ae){
+                            dis[0]=loc.anchors.dist.dist[i];}
+                            //printf("loc.anchors.dist.sddr: %lu\n",loc.anchors.dist.dist[i] );
+                            //printf("dis[0]: %lu\n",dis[0] );}
+                    if (loc.anchors.dist.addr[i]==0x4aa4){
+                            dis[1]=loc.anchors.dist.dist[i];}
+                    if (loc.anchors.dist.addr[i]==0x9294){
+                            dis[2]=loc.anchors.dist.dist[i];}}
+double x,y,z,a_p,b_p,c_p,cos1,cos2,term1, term2;
+        term1=(dis[0]*dis[0]-dis[1]*dis[1]+1200*1200)/2400;
+        term2=(dis[0]*dis[0]-dis[2]*dis[2]+1200*1200)/2400;
+        z=sqrt(dis[0]*dis[0]-term1*term1-term2*term2);
+        printf("z axies is : %lf",z);
+        z=0;
+        a_p=sqrt(dis[0]*dis[0]-z);
+        b_p=sqrt(dis[1]*dis[1]-z);
+        c_p=sqrt(dis[2]*dis[2]-z);
+        cos1=(1200*1200+a_p*a_p-c_p*c_p)/(2*1200*a_p);
+        //printf("cos1:%f\n",cos1);
+        y=cos1*a_p;
+        cos2=(1200*1200+a_p*a_p-b_p*b_p)/(2*1200*a_p);
+        //printf("cos2: %f\n",cos2);
+        x=cos2*a_p;
+        printf("Calculated position is : [%lf, %lf, %lf]\n\n", x, y, z);
+
+
+
+
+
+
+
+    /*x=(dis[0]*dis[0]-dis[1]*dis[1]+pos[0]*pos[0])/(2*pos[0]);
+    y=(dis[0]*dis[0]-dis[2]*dis[2]+pos[1]*pos[1])/(2*pos[1]);
+    z=sqrt(dis[0]*dis[0]-x*x-y*y);
+    printf("Calculated position is : [%ld, %ld, %ld]\n", x, y, z);*/
+
+
+
                 printf("\n");
-        } else {
+        }else {
                 printf("err code: %d\n", rv);
-        }      
+        }  
+            
 
         for (int i=100;i<100;i++)
         {i2cbyteXH = 0x28;
