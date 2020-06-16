@@ -11,6 +11,12 @@
 #include "dwm.h"
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
+
+/*kalman*/
+#define rand10_10() (rand() % 21 - 10)  //random noise
+
+
 
 /* Thread priority */
 #ifndef THREAD_APP_PRIO
@@ -101,53 +107,6 @@ void on_dwm_evt(dwm_evt_t *p_evt)
 	}
 }
 
-/*get x,y position using distance
-
-
-struct Point threePoints(int *dis, struct Point *ps){
-        struct Point p;
-        p.x=0;
-        p.y=0;
-        if (dis==NULL || ps==NULL)
-                return p;
-        for (int j=0; j<3; ++j){
-                if (dis[j]<0)
-                        printf("There is an error with the distance!");
-                for (int k=j+1;k<3;++k){
-                        printf("debug:%d\n",dis[j]);
-                        float p2p= (float)sqrt((ps[j].x-ps[k].x)*(ps[j].x-ps[k].x)+(ps[j].y-ps[k].y)*(ps[j].y-ps[k].y));
-                        if(dis[j]+dis[k]<=p2p){
-                                p.x +=ps[j].x+(ps[k].x-ps[j].x)*dis[j]/(dis[j]+dis[k]);
-                                //printf("can you see me!!!!");
-                                p.y +=ps[j].y+(ps[k].y-ps[j].y)*dis[j]/(dis[j]+dis[k]);}
-                        else{
-                                float dr=p2p/2+(dis[j]*dis[j]+dis[k]*dis[k])/(2*p2p);
-                                p.x += ps[j].x+(ps[k].x-ps[j].x)*dr/p2p;
-                                //printf("p.x value is : %d",p.x);
-                                //printf("look here!!!!");
-                                p.y += ps[j].y+(ps[k].y-ps[j].y)*dr/p2p;
-                        }
-                }
-        }
-        p.x /=3;
-        p.y /=3;
-        double z,a_p,b_p,c_p,cos1,cos2;
-        z=dis[0]*dis[0]-((3600*3600+dis[0]*dis[0]-dis[2]*dis[2])/(3600*2))*((3600*3600+dis[0]*dis[0]-dis[2]*dis[2])/(3600*2))-((2400*2400+dis[0]*dis[0]-dis[1]*dis[1])/(2400*2))*((2400*2400+dis[0]*dis[0]-dis[1]*dis[1])/(2400*2));
-        printf("z axies is : %f",z);
-        z=0;
-        a_p=sqrt(dis[0]*dis[0]-z);
-        b_p=sqrt(dis[1]*dis[1]-z);
-        c_p=sqrt(dis[2]*dis[2]-z);
-        cos1=(3600*3600+a_p*a_p-c_p*c_p)/(2*3600*a_p);
-        printf("cos1:%f\n",cos1);
-        p.x=cos1*a_p;
-        cos2=(2400*2400+a_p*a_p-b_p*b_p)/(2*2400*a_p);
-        printf("cos2: %f\n",cos2);
-        p.y=cos2*a_p;
-
-        
-        printf("Calculate position is [%d,%d]", p.x, p.y);
-}*/
 /**
  * Application thread
  *
@@ -166,7 +125,7 @@ void app_thread_entry(uint32_t data)
         uint8_t i2cbyteZH;
         uint8_t i2cbyteZL;
         int16_t i2cbyteZ;
-        float x,y,z;
+        float a_x, a_y, a_z, accel;
 
 
 
@@ -198,8 +157,7 @@ void app_thread_entry(uint32_t data)
 			DWM_EVT_UWBMAC_JOINED_CHANGED, NULL);
 
         /* Test the accelerometer */
-        i2cbyte = 0x57;
-        rv = dwm_i2c_write(0x20, &i2cbyte, 1, true);
+
 	i2cbyte = 0x0f;
 	rv = dwm_i2c_write(0x33 >> 1, &i2cbyte, 1, true);
 
@@ -232,12 +190,60 @@ void app_thread_entry(uint32_t data)
          a=loc.pos.x;
          b=loc.pos.y;
          c=loc.pos.z;
+         /*set high resolution*/
+         uint8_t Data[2];
+        const uint8_t addr = 0x19 ;
+        Data[0] = 0x20;
+        Data[1] = 0x57;
+        dwm_i2c_write(addr, Data, 2, true);
+
+        Data[0] = 0x23;
+        Data[1] = 0x08;
+        dwm_i2c_write(addr, Data, 2, true);
+
+while(1){
+for (int i=0;i<0;i++)
+        {i2cbyteXL = 0x28;
+        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteXL, 1, true);
+	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteXL, 1);
+        i2cbyteXH = 0x29;
+        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteXH, 1, true);
+	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteXH, 1);
+        i2cbyteX=(i2cbyteXH<<8)|i2cbyteXL;
+        a_x=i2cbyteX/64*0.004;
+
+        
+
+        i2cbyteYL = 0x2A;
+        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteYL, 1, true);
+	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteYL, 1);
+        i2cbyteYH = 0x2B;
+        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteYH, 1, true);
+	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteYH, 1);
+        i2cbyteY=(i2cbyteYH<<8)|i2cbyteYL;
+        a_y=i2cbyteY/64*0.004;
 
 
-	while (1) {
+        i2cbyteZL = 0x2C;
+        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteZL, 1, true);
+	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteZL, 1);
+        i2cbyteZH = 0x2D;
+        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteZH, 1, true);
+	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteZH, 1);
+        i2cbyteZ=(i2cbyteZH<<8)|i2cbyteZL;
+        a_z=i2cbyteZ/64*0.004;
+
+        accel=fabs(a_x+a_y+a_z)-1;
+        printf("a_x :%f   a_y:%f   a_z:%f\n",a_x,a_y,a_z);
+      printf("acceleration :%f\n",accel);
+        }
+
+
+
+
 /*get last distance to the anchors and the position*/
+
                rv = dwm_loc_get(&loc);
-               printf("0");
  
         if (0 == rv) {
                 if (loc.pos_available) {
@@ -251,7 +257,7 @@ void app_thread_entry(uint32_t data)
                         f=loc.pos.z;
                         double velocity;
                         velocity=fabs(sqrt(a*a+b*b+c*c)-sqrt(d*d+e*e+f*f));
-                        printf("velocity%lf \n", velocity);
+                        //printf("velocity%lf \n", velocity);
                         a=loc.pos.x;
                         b=loc.pos.y;
                         c=loc.pos.z;
@@ -259,14 +265,15 @@ void app_thread_entry(uint32_t data)
                 }
 
 
-         for (i = 0; i < loc.anchors.dist.cnt; ++i) {
-                    printf("%u)", i);
-                    printf("0x%04x", loc.anchors.dist.addr[i]);
-                    printf("=%lu,%u \n", loc.anchors.dist.dist[i], loc.anchors.dist.qf[i]);}
-                        
-/*law of cosine*/
-uint32_t dis[]={0,0,0};
+                printf("\n");
+        }else {
+                printf("err code: %d\n", rv);
+        }  
 
+
+
+/*trilateration  i do not know*/
+uint32_t dis[]={0,0,0};
 
 for (i = 0; i < loc.anchors.dist.cnt; ++i) {
                     if (loc.anchors.dist.addr[i]==0xd4ae){
@@ -277,75 +284,53 @@ for (i = 0; i < loc.anchors.dist.cnt; ++i) {
                             dis[1]=loc.anchors.dist.dist[i];}
                     if (loc.anchors.dist.addr[i]==0x9294){
                             dis[2]=loc.anchors.dist.dist[i];}}
-double x,y,z,a_p,b_p,c_p,cos1,cos2,term1, term2;
-        term1=(dis[0]*dis[0]-dis[1]*dis[1]+1200*1200)/2400;
-        term2=(dis[0]*dis[0]-dis[2]*dis[2]+1200*1200)/2400;
-        z=sqrt(dis[0]*dis[0]-term1*term1-term2*term2);
-        printf("z axies is : %lf",z);
-        z=0;
-        a_p=sqrt(dis[0]*dis[0]-z);
-        b_p=sqrt(dis[1]*dis[1]-z);
-        c_p=sqrt(dis[2]*dis[2]-z);
-        cos1=(1200*1200+a_p*a_p-c_p*c_p)/(2*1200*a_p);
-        //printf("cos1:%f\n",cos1);
-        y=cos1*a_p;
-        cos2=(1200*1200+a_p*a_p-b_p*b_p)/(2*1200*a_p);
-        //printf("cos2: %f\n",cos2);
-        x=cos2*a_p;
-        printf("Calculated position is : [%lf, %lf, %lf]\n\n", x, y, z);
+
+struct point points[3];
+        //anchor1
+	points[0].x= 0;
+	points[0].y = 0;
+	double r1 = dis[0]; //distance from tag to anchor1
 
 
+	//anchor2
+        points[1].x = 1200;
+	points[1].y = 600;
+	double r2=dis[1];//distance from tag to anchor2
 
+	//anchor3
+	points[2].x = 0;
+	points[2].y = 1200;
+	double r3 = dis[2];//distance from tag to anchor3
 
+	//trilateration_1(points[0], points[1], points[2], r1, r2, r3);
+struct point point1=points[0];
+struct point point2=points[1];
+struct point point3=points[2];
+        struct point resultPose;
+	//unit vector in a direction from point1 to point 2  
+	double p2p1Distance = pow(pow(point2.x - point1.x, 2) + pow(point2.y - point1.y, 2), 0.5);
+	struct point ex = { (point2.x - point1.x) / p2p1Distance, (point2.y - point1.y) / p2p1Distance };
+	struct point aux = { point3.x - point1.x,point3.y - point1.y };
+	//signed magnitude of the x component  
+	double ii = ex.x * aux.x + ex.y * aux.y;
+	//the unit vector in the y direction.  
+	struct point aux2 = { point3.x - point1.x - ii * ex.x, point3.y - point1.y - ii * ex.y };
+	struct point ey = { aux2.x / norm(aux2), aux2.y / norm(aux2) };
+	//the signed magnitude of the y component  
+	double jj = ey.x * aux.x + ey.y * aux.y;
+	//coordinates  
+	double x = (pow(r1, 2) - pow(r2, 2) + pow(p2p1Distance, 2)) / (2 * p2p1Distance);
+	double y = (pow(r1, 2) - pow(r3, 2) + pow(ii, 2) + pow(jj, 2)) / (2 * jj) - ii * x / jj;
+	//result coordinates  
+	double finalX = point1.x + x * ex.x + y * ey.x;
+	double finalY = point1.y + x * ex.y + y * ey.y;
+	resultPose.x = finalX;
+	resultPose.y = finalY;
 
-
-
-    /*x=(dis[0]*dis[0]-dis[1]*dis[1]+pos[0]*pos[0])/(2*pos[0]);
-    y=(dis[0]*dis[0]-dis[2]*dis[2]+pos[1]*pos[1])/(2*pos[1]);
-    z=sqrt(dis[0]*dis[0]-x*x-y*y);
-    printf("Calculated position is : [%ld, %ld, %ld]\n", x, y, z);*/
-
-
-
-                printf("\n");
-        }else {
-                printf("err code: %d\n", rv);
-        }  
-            
-
-        for (int i=100;i<100;i++)
-        {i2cbyteXH = 0x28;
-        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteXH, 1, true);
-	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteXH, 1);
-        i2cbyteXH = 0x29;
-        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteXH, 1, true);
-	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteXH, 1);
-        i2cbyteX=(i2cbyteXH<<8)|i2cbyteXL;
-        x=i2cbyteX/64*0.004;
-
-        i2cbyteYH = 0x2a;
-        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteYH, 1, true);
-	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteYH, 1);
-        i2cbyteYH = 0x2b;
-        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteYH, 1, true);
-	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteYH, 1);
-        i2cbyteY=(i2cbyteYH<<8)|i2cbyteYL;
-        y=i2cbyteY/64*0.004;
-
-        i2cbyteZH = 0x2c;
-        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteZH, 1, true);
-	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteZH, 1);
-        i2cbyteZH = 0x2d;
-        rv = dwm_i2c_write(0x33 >> 1, &i2cbyteZH, 1, true);
-	rv = dwm_i2c_read(0x33 >> 1, &i2cbyteZH, 1);
-        i2cbyteZ=(i2cbyteZH<<8)|i2cbyteZL;
-        z=i2cbyteZ/64*0.004;
-
-        printf("acceleration data:x= %f, y=%f, z=%f\n",x, y, z);}
-        
-       
-
-		
+	printf("TAG LOC My1:x = %3.2f,y = %3.2f\r\n", resultPose.x, resultPose.y);
+         
+//printf("x value is: %f\n", x);
+	
                 /* Thread loop */
 		rv = dwm_evt_wait(&evt);
 
@@ -354,8 +339,249 @@ double x,y,z,a_p,b_p,c_p,cos1,cos2,term1, term2;
 		} else {
 			on_dwm_evt(&evt);
 		}
+	
+}}
+
+
+int double_equals(double a, double b)
+{
+	static const double ZERO = 1e-9;
+	return fabs(a - b) < ZERO;
+}
+
+double distance_sqr(struct point_t* a, struct point_t* b)
+{
+	return (a->x - b->x) * (a->x - b->x) + (a->y - b->y) * (a->y - b->y);
+}
+
+double distance(struct point_t* a, struct point_t* b)
+{
+	return sqrt(distance_sqr(a, b));
+}
+
+int insect(struct circle_t circles[], struct point_t points[])
+{
+	double d, a, b, c, p, q, r;
+	double cos_value[2], sin_value[2];
+	if (double_equals(circles[0].center.x, circles[1].center.x)
+		&& double_equals(circles[0].center.y, circles[1].center.y)
+		&& double_equals(circles[0].r, circles[1].r))
+	{
+		printf("-1");
+                return -1;
+	}
+
+	d = distance(&circles[0].center, &circles[1].center);
+	if (d > circles[0].r + circles[1].r
+		|| d < fabs(circles[0].r - circles[1].r))
+	{
+		printf("0");
+                return 0;
+	}
+
+	a = 2.0 * circles[0].r * (circles[0].center.x - circles[1].center.x);
+	b = 2.0 * circles[0].r * (circles[0].center.y - circles[1].center.y);
+	c = circles[1].r * circles[1].r - circles[0].r * circles[0].r
+		- distance_sqr(&circles[0].center, &circles[1].center);
+	p = a * a + b * b;
+	q = -2.0 * a * c;
+	if (double_equals(d, circles[0].r + circles[1].r)
+		|| double_equals(d, fabs(circles[0].r - circles[1].r)))
+	{
+		cos_value[0] = -q / p / 2.0;
+		sin_value[0] = sqrt(1 - cos_value[0] * cos_value[0]);
+
+		points[0].x = circles[0].r * cos_value[0] + circles[0].center.x;
+		points[0].y = circles[0].r * sin_value[0] + circles[0].center.y;
+
+		if (!double_equals(distance_sqr(&points[0], &circles[1].center),
+			circles[1].r * circles[1].r))
+		{
+			points[0].y = circles[0].center.y - circles[0].r * sin_value[0];
+		}
+		printf("1");
+                return 1;
+	}
+        a = 2.0 * circles[0].r * (circles[0].center.x - circles[1].center.x);
+	b = 2.0 * circles[0].r * (circles[0].center.y - circles[1].center.y);
+	c = circles[1].r * circles[1].r - circles[0].r * circles[0].r
+		- distance_sqr(&circles[0].center, &circles[1].center);
+	p = a * a + b * b;
+	q = -2.0 * a * c;
+        if (double_equals(d, circles[0].r + circles[1].r)
+		|| double_equals(d, fabs(circles[0].r - circles[1].r)))
+	{
+		cos_value[0] = -q / p / 2.0;
+		sin_value[0] = sqrt(1 - cos_value[0] * cos_value[0]);
+
+		points[0].x = circles[0].r * cos_value[0] + circles[0].center.x;
+		points[0].y = circles[0].r * sin_value[0] + circles[0].center.y;
+
+		if (!double_equals(distance_sqr(&points[0], &circles[1].center),
+			circles[1].r * circles[1].r))
+		{
+			points[0].y = circles[0].center.y - circles[0].r * sin_value[0];
+		}
+		printf("1");
+                return 1;
+        }
+        r = c * c - b * b;
+	cos_value[0] = (sqrt(q * q - 4.0 * p * r) - q) / p / 2.0;
+	cos_value[1] = (-sqrt(q * q - 4.0 * p * r) - q) / p / 2.0;
+	sin_value[0] = sqrt(1 - cos_value[0] * cos_value[0]);
+	sin_value[1] = sqrt(1 - cos_value[1] * cos_value[1]);
+
+	points[0].x = circles[0].r * cos_value[0] + circles[0].center.x;
+	points[1].x = circles[0].r * cos_value[1] + circles[0].center.x;
+	points[0].y = circles[0].r * sin_value[0] + circles[0].center.y;
+	points[1].y = circles[0].r * sin_value[1] + circles[0].center.y;
+        if (!double_equals(distance_sqr(&points[0], &circles[1].center),
+		circles[1].r * circles[1].r))
+	{
+		points[0].y = circles[0].center.y - circles[0].r * sin_value[0];
+	}
+	if (!double_equals(distance_sqr(&points[1], &circles[1].center),
+		circles[1].r * circles[1].r))
+	{
+		points[1].y = circles[0].center.y - circles[0].r * sin_value[1];
+	}
+	if (double_equals(points[0].y, points[1].y)
+		&& double_equals(points[0].x, points[1].x))
+	{
+		if (points[0].y > 0)
+		{
+			points[1].y = -points[1].y;
+		}
+		else
+		{
+			points[0].y = -points[0].y;
+		}
+	}
+	printf("2");
+        return 2;
+}
+
+void Cross_Point(struct circle_t circles[], struct point_t Location[])
+{
+	int cross_num = 5;
+	struct point_t cross_points[2];
+	cross_num = insect(circles, cross_points);// 0 1
+        
+	if (cross_num == 2)
+	{
+		double points_AC_0 = distance(&cross_points[0], &circles[2].center);
+		double points_AC_1 = distance(&cross_points[1], &circles[2].center);
+
+		if (abs((int)(points_AC_0 - circles[2].r) )< abs((int)(points_AC_1 - circles[2].r)))//cross_point[0]
+		{
+			Location[0].x = cross_points[0].x;
+			Location[0].y = cross_points[0].y;
+		}
+		else
+		{
+			Location[0].x = cross_points[1].x;
+			Location[0].y = cross_points[1].y;
+		}
+
+	}
+	else if (cross_num == 1 || cross_num == 0)
+	{
+		Location[0].x = cross_points[0].x;
+		Location[0].y = cross_points[0].y;
 	}
 }
+float norm(struct point p) // get the norm of a vector
+{
+	return pow(pow(p.x, 2) + pow(p.y, 2), .5);
+}
+void trilateration_1(struct point point1, struct point point2, struct point point3, double r1, double r2, double r3) 
+{
+	struct point resultPose;
+	//unit vector in a direction from point1 to point 2  ??1??2????????
+	double p2p1Distance = pow(pow(point2.x - point1.x, 2) + pow(point2.y - point1.y, 2), 0.5);
+	struct point ex = { (point2.x - point1.x) / p2p1Distance, (point2.y - point1.y) / p2p1Distance };
+	struct point aux = { point3.x - point1.x,point3.y - point1.y };
+	//signed magnitude of the x component  x???????
+	double i = ex.x * aux.x + ex.y * aux.y;
+	//the unit vector in the y direction.  y????????T
+	struct point aux2 = { point3.x - point1.x - i * ex.x, point3.y - point1.y - i * ex.y };
+	struct point ey = { aux2.x / norm(aux2), aux2.y / norm(aux2) };
+	//the signed magnitude of the y component  y???????
+	double j = ey.x * aux.x + ey.y * aux.y;
+	//coordinates  ??
+	double x = (pow(r1, 2) - pow(r2, 2) + pow(p2p1Distance, 2)) / (2 * p2p1Distance);
+	double y = (pow(r1, 2) - pow(r3, 2) + pow(i, 2) + pow(j, 2)) / (2 * j) - i * x / j;
+	//result coordinates   ????
+	double finalX = point1.x + x * ex.x + y * ey.x;
+	double finalY = point1.y + x * ex.y + y * ey.y;
+	resultPose.x = finalX;
+	resultPose.y = finalY;
+
+	printf("TAG LOC My1:x = %3.2f,y = %3.2f\r\n", resultPose.x, resultPose.y);//???????
+
+}
+
+
+//kalman parameter initialize
+void kalman_init(kalman2_state *state, float *init_x, float (*init_p)[2])
+{
+    state->x[0]    = init_x[0];
+    state->x[1]    = init_x[1];
+    state->p[0][0] = init_p[0][0];
+    state->p[0][1] = init_p[0][1];
+    state->p[1][0] = init_p[1][0];
+    state->p[1][1] = init_p[1][1];
+    //state->A       = {{1, 0.1}, {0, 1}};
+    state->A[0][0] = 1;
+    state->A[0][1] = 0.1;
+    state->A[1][0] = 0;
+    state->A[1][1] = 1;
+    //state->H       = {1,0};
+    state->H[0]    = 1;
+    state->H[1]    = 0;
+    //state->q       = {{10e-6,0}, {0,10e-6}};  /* measure noise convariance */
+    state->q[0]    = 10e-7;
+    state->q[1]    = 10e-7;
+    state->r       = 10e-7;  /* estimated error convariance */
+}
+
+float kalman_filter(kalman2_state *state, float z_measure)
+{
+    float temp0 = 0.0f;
+    float temp1 = 0.0f;
+    float temp = 0.0f;
+ 
+    /* Step1: Predict */
+    state->x[0] = state->A[0][0] * state->x[0] + state->A[0][1] * state->x[1];
+    state->x[1] = state->A[1][0] * state->x[0] + state->A[1][1] * state->x[1];
+    /* p(n|n-1)=A^2*p(n-1|n-1)+q */
+    state->p[0][0] = state->A[0][0] * state->p[0][0] + state->A[0][1] * state->p[1][0] + state->q[0];
+    state->p[0][1] = state->A[0][0] * state->p[0][1] + state->A[1][1] * state->p[1][1];
+    state->p[1][0] = state->A[1][0] * state->p[0][0] + state->A[0][1] * state->p[1][0];
+    state->p[1][1] = state->A[1][0] * state->p[0][1] + state->A[1][1] * state->p[1][1] + state->q[1];
+ 
+    /* Step2: Measurement */
+    /* gain = p * H^T * [r + H * p * H^T]^(-1), H^T means transpose. */
+    temp0 = state->p[0][0] * state->H[0] + state->p[0][1] * state->H[1];
+    temp1 = state->p[1][0] * state->H[0] + state->p[1][1] * state->H[1];
+    temp  = state->r + state->H[0] * temp0 + state->H[1] * temp1;
+    state->gain[0] = temp0 / temp;
+    state->gain[1] = temp1 / temp;
+    /* x(n|n) = x(n|n-1) + gain(n) * [z_measure - H(n)*x(n|n-1)]*/
+    temp = state->H[0] * state->x[0] + state->H[1] * state->x[1];
+    state->x[0] = state->x[0] + state->gain[0] * (z_measure - temp); 
+    state->x[1] = state->x[1] + state->gain[1] * (z_measure - temp);
+ 
+    /* Update @p: p(n|n) = [I - gain * H] * p(n|n-1) */
+    state->p[0][0] = (1 - state->gain[0] * state->H[0]) * state->p[0][0];
+    state->p[0][1] = (1 - state->gain[0] * state->H[1]) * state->p[0][1];
+    state->p[1][0] = (1 - state->gain[1] * state->H[0]) * state->p[1][0];
+    state->p[1][1] = (1 - state->gain[1] * state->H[1]) * state->p[1][1];
+ 
+    return state->x[0];
+}
+
+
 
 /**
  * Application entry point. Initialize application thread.
